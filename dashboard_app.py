@@ -71,26 +71,14 @@ total = len(filtered)
 valorizadores = filtered["Valorizador"].nunique()
 comunas = filtered["Sucursal"].nunique()
 
-# ===== EVOLUCIÓN (ROBUSTA) =====
+# ===== CRECIMIENTO (MENSUAL) =====
 if not filtered.empty:
+    df_time_kpi = filtered.copy().set_index("Fecha emisión")
+    mensual_kpi = df_time_kpi.resample("MS").size().reset_index()
 
-    df_time = filtered.copy()
-
-    df_time["Fecha emisión"] = pd.to_datetime(
-        df_time["Fecha emisión"],
-        errors="coerce"
-    )
-
-    df_time = df_time.dropna(subset=["Fecha emisión"])
-
-    df_time = df_time.set_index("Fecha emisión")
-
-    mensual = df_time.resample("MS").size().reset_index()
-    mensual.columns = ["Fecha", "Cantidad"]
-
-    if len(mensual) >= 2:
-        actual = mensual["Cantidad"].iloc[-1]
-        anterior = mensual["Cantidad"].iloc[-2]
+    if len(mensual_kpi) >= 2:
+        actual = mensual_kpi.iloc[-1, 1]
+        anterior = mensual_kpi.iloc[-2, 1]
 
         if anterior != 0:
             crecimiento = ((actual - anterior) / anterior) * 100
@@ -98,15 +86,13 @@ if not filtered.empty:
             crecimiento = 0
     else:
         crecimiento = 0
-
 else:
-    mensual = pd.DataFrame()
     crecimiento = 0
 
 col1.metric("Operaciones", total)
 col2.metric("Valorizadores", valorizadores)
 col3.metric("Cobertura", comunas)
-col4.metric("Crecimiento", f"{crecimiento:.1f}%")
+col4.metric("Crecimiento mensual", f"{crecimiento:.1f}%")
 
 # ===== INSIGHTS =====
 st.markdown("### 🧠 Insights Clave")
@@ -131,23 +117,34 @@ col1, col2 = st.columns(2)
 with col1:
     if not filtered.empty:
         st.bar_chart(filtered["Sucursal"].value_counts())
-    else:
-        st.warning("Sin datos")
 
 with col2:
     if not filtered.empty:
         st.bar_chart(filtered["Valorizador"].value_counts())
-    else:
-        st.warning("Sin datos")
 
-# ===== EVOLUCIÓN =====
+# ===== EVOLUCIÓN DINÁMICA 🔥 =====
 st.markdown("### ⏳ Evolución")
 
-if not mensual.empty:
-    mensual["Fecha"] = mensual["Fecha"].dt.strftime("%m-%Y")
-    st.line_chart(mensual.set_index("Fecha"))
+tipo = st.radio("Tipo de vista", ["Diaria", "Mensual"], horizontal=True)
+
+if not filtered.empty:
+
+    df_time = filtered.copy()
+    df_time = df_time.set_index("Fecha emisión")
+
+    if tipo == "Diaria":
+        evolucion = df_time.resample("D").size().reset_index()
+        evolucion["Fecha"] = evolucion["Fecha emisión"].dt.strftime("%d-%m-%Y")
+    else:
+        evolucion = df_time.resample("MS").size().reset_index()
+        evolucion["Fecha"] = evolucion["Fecha emisión"].dt.strftime("%m-%Y")
+
+    evolucion.columns = ["Fecha emisión", "Cantidad", "Fecha"]
+
+    st.line_chart(evolucion.set_index("Fecha")["Cantidad"])
+
 else:
-    st.warning("No hay datos suficientes para mostrar evolución")
+    st.warning("No hay datos para mostrar evolución")
 
 # ===== RANKING =====
 st.markdown("### 🏆 Ranking")
