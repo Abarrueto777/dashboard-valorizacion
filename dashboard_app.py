@@ -24,7 +24,11 @@ else:
         st.stop()
 
 # LIMPIEZA
-df["Fecha emisión"] = pd.to_datetime(df["Fecha emisión"], errors="coerce")
+df["Fecha emisión"] = pd.to_datetime(
+    df["Fecha emisión"],
+    dayfirst=True,
+    errors="coerce"
+)
 
 # FILTRO FECHA
 st.sidebar.subheader("📅 Periodo")
@@ -37,9 +41,12 @@ rango = st.sidebar.date_input("Rango", [fecha_min, fecha_max])
 filtered = df.copy()
 
 if len(rango) == 2:
+    inicio = pd.to_datetime(rango[0])
+    fin = pd.to_datetime(rango[1]) + pd.Timedelta(days=1)
+
     filtered = filtered[
-        (filtered["Fecha emisión"] >= pd.to_datetime(rango[0])) &
-        (filtered["Fecha emisión"] <= pd.to_datetime(rango[1]))
+        (filtered["Fecha emisión"] >= inicio) &
+        (filtered["Fecha emisión"] < fin)
     ]
 
 # FILTROS
@@ -130,4 +137,8 @@ st.download_button(
 # DATA
 st.markdown("### 📄 Detalle")
 
-st.dataframe(filtered, use_container_width=True)
+# Convertir SOLO para visualización
+tabla_mostrar = filtered.copy()
+tabla_mostrar["Fecha emisión"] = tabla_mostrar["Fecha emisión"].dt.strftime("%d-%m-%Y")
+
+st.dataframe(tabla_mostrar, use_container_width=True)
