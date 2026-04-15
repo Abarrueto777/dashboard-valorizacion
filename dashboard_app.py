@@ -22,17 +22,16 @@ else:
     else:
         st.stop()
 
-# ===== LIMPIEZA DE FECHAS (CLAVE) =====
+# ===== LIMPIEZA DE FECHAS =====
 df["Fecha emisión"] = pd.to_datetime(
     df["Fecha emisión"],
     dayfirst=True,
     errors="coerce"
 )
 
-# eliminar fechas inválidas
 df = df.dropna(subset=["Fecha emisión"])
 
-# ===== FILTRO POR FECHA =====
+# ===== FILTRO FECHA =====
 st.sidebar.subheader("📅 Periodo")
 
 fecha_min = df["Fecha emisión"].min()
@@ -72,26 +71,23 @@ total = len(filtered)
 valorizadores = filtered["Valorizador"].nunique()
 comunas = filtered["Sucursal"].nunique()
 
-# ===== EVOLUCIÓN (SOLUCIÓN ROBUSTA 🔥) =====
+# ===== EVOLUCIÓN (ROBUSTA) =====
 if not filtered.empty:
 
     df_time = filtered.copy()
 
-# asegurarse que es datetime real
-df_time["Fecha emisión"] = pd.to_datetime(df_time["Fecha emisión"], errors="coerce")
+    df_time["Fecha emisión"] = pd.to_datetime(
+        df_time["Fecha emisión"],
+        errors="coerce"
+    )
 
-# eliminar nulos
-df_time = df_time.dropna(subset=["Fecha emisión"])
+    df_time = df_time.dropna(subset=["Fecha emisión"])
 
-# setear índice correctamente
-df_time = df_time.set_index("Fecha emisión")
+    df_time = df_time.set_index("Fecha emisión")
 
-# 🔥 usar 'MS' en vez de 'M' (más estable en cloud)
-mensual = df_time.resample("MS").size().reset_index()
+    mensual = df_time.resample("MS").size().reset_index()
+    mensual.columns = ["Fecha", "Cantidad"]
 
-mensual.columns = ["Fecha", "Cantidad"]
-
-    # crecimiento
     if len(mensual) >= 2:
         actual = mensual["Cantidad"].iloc[-1]
         anterior = mensual["Cantidad"].iloc[-2]
@@ -182,3 +178,5 @@ if not filtered.empty:
     tabla_mostrar["Fecha emisión"] = tabla_mostrar["Fecha emisión"].dt.strftime("%d-%m-%Y")
 
     st.dataframe(tabla_mostrar, use_container_width=True)
+else:
+    st.warning("No hay datos para mostrar")
