@@ -4,25 +4,28 @@ import pandas as pd
 # CONFIG
 st.set_page_config(page_title="Dashboard Valorización", layout="wide")
 
-st.title("📊 Dashboard de Valorización")
+st.title("♻️ Dashboard de Valorización")
 
-# CARGA DE DATOS
-df = pd.read_excel("resultado.xlsx")
+# SIDEBAR
+st.sidebar.header("⚙️ Configuración")
+
+archivo = st.sidebar.file_uploader("Sube tu archivo Excel", type=["xlsx"])
+
+if archivo is not None:
+    df = pd.read_excel(archivo)
+else:
+    st.warning("Sube un archivo para comenzar")
+    st.stop()
 
 # LIMPIEZA
 df["Fecha emisión"] = pd.to_datetime(df["Fecha emisión"], errors="coerce")
 
 # FILTROS
-col1, col2, col3 = st.columns(3)
+st.sidebar.subheader("🔎 Filtros")
 
-with col1:
-    comuna = st.selectbox("Comuna", ["Todas"] + list(df["Sucursal"].dropna().unique()))
-
-with col2:
-    valorizador = st.selectbox("Valorizador", ["Todos"] + list(df["Valorizador"].dropna().unique()))
-
-with col3:
-    patente = st.selectbox("Patente", ["Todas"] + list(df["Patente"].dropna().unique()))
+comuna = st.sidebar.selectbox("Comuna", ["Todas"] + list(df["Sucursal"].dropna().unique()))
+valorizador = st.sidebar.selectbox("Valorizador", ["Todos"] + list(df["Valorizador"].dropna().unique()))
+patente = st.sidebar.selectbox("Patente", ["Todas"] + list(df["Patente"].dropna().unique()))
 
 # FILTRADO
 filtered = df.copy()
@@ -37,37 +40,53 @@ if patente != "Todas":
     filtered = filtered[filtered["Patente"] == patente]
 
 # KPIs
-st.subheader("📌 Indicadores clave")
+st.subheader("📊 Indicadores clave")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("Total registros", len(filtered))
-col2.metric("Valorizadores únicos", filtered["Valorizador"].nunique())
-col3.metric("Comunas activas", filtered["Sucursal"].nunique())
+col2.metric("Valorizadores", filtered["Valorizador"].nunique())
+col3.metric("Comunas", filtered["Sucursal"].nunique())
+
+# CRECIMIENTO MENSUAL 🔥
+filtered["Mes"] = filtered["Fecha emisión"].dt.to_period("M")
+
+mensual = filtered.groupby("Mes").size().reset_index(name="Cantidad")
+
+if len(mensual) >= 2:
+    crecimiento = ((mensual["Cantidad"].iloc[-1] - mensual["Cantidad"].iloc[-2]) / mensual["Cantidad"].iloc[-2]) * 100
+    col4.metric("Crecimiento mensual", f"{crecimiento:.1f}%")
+else:
+    col4.metric("Crecimiento mensual", "N/A")
 
 # GRÁFICOS
-st.subheader("📊 Análisis")
+st.subheader("📈 Análisis")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.write("Distribución por comuna")
+    st.write("📍 Distribución por comuna")
     st.bar_chart(filtered["Sucursal"].value_counts())
 
 with col2:
-    st.write("Top valorizadores")
+    st.write("🏆 Top valorizadores")
     st.bar_chart(filtered["Valorizador"].value_counts())
 
-# EVOLUCIÓN EN EL TIEMPO 🔥
+# EVOLUCIÓN
 st.subheader("⏳ Evolución en el tiempo")
 
-time_data = filtered.copy()
-time_data["Mes"] = time_data["Fecha emisión"].dt.to_period("M").astype(str)
+mensual["Mes"] = mensual["Mes"].astype(str)
+st.line_chart(mensual.set_index("Mes"))
 
-evolucion = time_data.groupby("Mes").size()
+# RANKING PRO
+st.subheader("🥇 Ranking valorizadores")
 
-st.line_chart(evolucion)
+ranking = filtered["Valorizador"].value_counts().reset_index()
+ranking.columns = ["Valorizador", "Cantidad"]
 
-# TABLA FINAL
-st.subheader("📄 Datos detallados")
+st.dataframe(ranking, use_container_width=True)
+
+# TABLA
+st.subheader("📄 Datos")
+
 st.dataframe(filtered, use_container_width=True)
