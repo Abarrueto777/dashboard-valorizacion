@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# CONFIG
+# CONFIGURACIÓN
 st.set_page_config(page_title="Dashboard Valorización", layout="wide")
 
 st.title("♻️ Dashboard de Valorización")
@@ -9,15 +9,25 @@ st.title("♻️ Dashboard de Valorización")
 # SIDEBAR
 st.sidebar.header("⚙️ Configuración")
 
-archivo = st.sidebar.file_uploader("Sube tu archivo Excel", type=["xlsx"])
+# MODO HÍBRIDO
+modo = st.sidebar.radio("Modo de uso", ["Datos compartidos", "Subir mi archivo"])
 
-if archivo is not None:
-    df = pd.read_excel(archivo)
+# CARGA DE DATOS
+if modo == "Datos compartidos":
+    try:
+        df = pd.read_excel("resultado.xlsx")
+    except:
+        st.error("No se encontró el archivo 'resultado.xlsx' en el repositorio")
+        st.stop()
 else:
-    st.warning("Sube un archivo para comenzar")
-    st.stop()
+    archivo = st.sidebar.file_uploader("Sube tu archivo Excel", type=["xlsx"])
+    if archivo is not None:
+        df = pd.read_excel(archivo)
+    else:
+        st.warning("Sube un archivo para continuar")
+        st.stop()
 
-# LIMPIEZA
+# LIMPIEZA DE DATOS
 df["Fecha emisión"] = pd.to_datetime(df["Fecha emisión"], errors="coerce")
 
 # FILTROS
@@ -48,13 +58,15 @@ col1.metric("Total registros", len(filtered))
 col2.metric("Valorizadores", filtered["Valorizador"].nunique())
 col3.metric("Comunas", filtered["Sucursal"].nunique())
 
-# CRECIMIENTO MENSUAL 🔥
+# CRECIMIENTO MENSUAL
 filtered["Mes"] = filtered["Fecha emisión"].dt.to_period("M")
 
 mensual = filtered.groupby("Mes").size().reset_index(name="Cantidad")
 
 if len(mensual) >= 2:
-    crecimiento = ((mensual["Cantidad"].iloc[-1] - mensual["Cantidad"].iloc[-2]) / mensual["Cantidad"].iloc[-2]) * 100
+    anterior = mensual["Cantidad"].iloc[-2]
+    actual = mensual["Cantidad"].iloc[-1]
+    crecimiento = ((actual - anterior) / anterior) * 100 if anterior != 0 else 0
     col4.metric("Crecimiento mensual", f"{crecimiento:.1f}%")
 else:
     col4.metric("Crecimiento mensual", "N/A")
@@ -72,13 +84,13 @@ with col2:
     st.write("🏆 Top valorizadores")
     st.bar_chart(filtered["Valorizador"].value_counts())
 
-# EVOLUCIÓN
+# EVOLUCIÓN EN EL TIEMPO
 st.subheader("⏳ Evolución en el tiempo")
 
 mensual["Mes"] = mensual["Mes"].astype(str)
 st.line_chart(mensual.set_index("Mes"))
 
-# RANKING PRO
+# RANKING
 st.subheader("🥇 Ranking valorizadores")
 
 ranking = filtered["Valorizador"].value_counts().reset_index()
@@ -86,7 +98,7 @@ ranking.columns = ["Valorizador", "Cantidad"]
 
 st.dataframe(ranking, use_container_width=True)
 
-# TABLA
-st.subheader("📄 Datos")
+# TABLA DETALLADA
+st.subheader("📄 Datos detallados")
 
 st.dataframe(filtered, use_container_width=True)
