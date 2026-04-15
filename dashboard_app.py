@@ -12,7 +12,7 @@ st.sidebar.header("⚙️ Configuración")
 
 modo = st.sidebar.radio("Modo de uso", ["Datos compartidos", "Subir archivo"])
 
-# CARGA DE DATOS
+# CARGA DATOS
 if modo == "Datos compartidos":
     df = pd.read_excel("resultado.xlsx")
 else:
@@ -22,17 +22,17 @@ else:
     else:
         st.stop()
 
-# LIMPIEZA FECHAS (CLAVE 🔥)
+# ===== LIMPIEZA DE FECHAS (CLAVE) =====
 df["Fecha emisión"] = pd.to_datetime(
     df["Fecha emisión"],
     dayfirst=True,
     errors="coerce"
 )
 
-# ELIMINAR FILAS SIN FECHA VÁLIDA
+# eliminar fechas inválidas
 df = df.dropna(subset=["Fecha emisión"])
 
-# FILTRO POR FECHA
+# ===== FILTRO POR FECHA =====
 st.sidebar.subheader("📅 Periodo")
 
 fecha_min = df["Fecha emisión"].min()
@@ -51,7 +51,7 @@ if len(rango) == 2:
         (filtered["Fecha emisión"] < fin)
     ]
 
-# FILTROS
+# ===== FILTROS =====
 st.sidebar.subheader("🔎 Segmentación")
 
 comuna = st.sidebar.selectbox("Comuna", ["Todas"] + list(df["Sucursal"].dropna().unique()))
@@ -63,7 +63,7 @@ if comuna != "Todas":
 if valorizador != "Todos":
     filtered = filtered[filtered["Valorizador"] == valorizador]
 
-# KPIs
+# ===== KPIs =====
 st.markdown("### 📌 Resumen Ejecutivo")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -72,23 +72,29 @@ total = len(filtered)
 valorizadores = filtered["Valorizador"].nunique()
 comunas = filtered["Sucursal"].nunique()
 
-# ===== EVOLUCIÓN Y CRECIMIENTO (CORREGIDO 🔥) =====
-filtered_valid = filtered.copy()
+# ===== EVOLUCIÓN (SOLUCIÓN ROBUSTA 🔥) =====
+if not filtered.empty:
 
-filtered_valid["Mes"] = filtered_valid["Fecha emisión"].dt.to_period("M")
+    df_time = filtered.copy()
+    df_time = df_time.set_index("Fecha emisión")
 
-mensual = filtered_valid.groupby("Mes").size().reset_index(name="Cantidad")
-mensual = mensual.sort_values("Mes")
+    mensual = df_time.resample("M").size().reset_index()
+    mensual.columns = ["Fecha", "Cantidad"]
 
-if len(mensual) >= 2:
-    actual = mensual["Cantidad"].iloc[-1]
-    anterior = mensual["Cantidad"].iloc[-2]
+    # crecimiento
+    if len(mensual) >= 2:
+        actual = mensual["Cantidad"].iloc[-1]
+        anterior = mensual["Cantidad"].iloc[-2]
 
-    if anterior != 0:
-        crecimiento = ((actual - anterior) / anterior) * 100
+        if anterior != 0:
+            crecimiento = ((actual - anterior) / anterior) * 100
+        else:
+            crecimiento = 0
     else:
         crecimiento = 0
+
 else:
+    mensual = pd.DataFrame()
     crecimiento = 0
 
 col1.metric("Operaciones", total)
@@ -96,7 +102,7 @@ col2.metric("Valorizadores", valorizadores)
 col3.metric("Cobertura", comunas)
 col4.metric("Crecimiento", f"{crecimiento:.1f}%")
 
-# INSIGHTS AUTOMÁTICOS
+# ===== INSIGHTS =====
 st.markdown("### 🧠 Insights Clave")
 
 if not filtered.empty:
@@ -109,9 +115,9 @@ if not filtered.empty:
 • El crecimiento mensual es de **{crecimiento:.1f}%**
 """)
 else:
-    st.warning("No hay datos para generar insights")
+    st.warning("No hay datos disponibles")
 
-# GRÁFICOS
+# ===== GRÁFICOS =====
 st.markdown("### 📈 Análisis")
 
 col1, col2 = st.columns(2)
@@ -120,35 +126,32 @@ with col1:
     if not filtered.empty:
         st.bar_chart(filtered["Sucursal"].value_counts())
     else:
-        st.warning("Sin datos para comuna")
+        st.warning("Sin datos")
 
 with col2:
     if not filtered.empty:
         st.bar_chart(filtered["Valorizador"].value_counts())
     else:
-        st.warning("Sin datos para valorizadores")
+        st.warning("Sin datos")
 
-# EVOLUCIÓN
+# ===== EVOLUCIÓN =====
 st.markdown("### ⏳ Evolución")
 
 if not mensual.empty:
-    mensual["Mes"] = mensual["Mes"].astype(str)
-    st.line_chart(mensual.set_index("Mes"))
+    mensual["Fecha"] = mensual["Fecha"].dt.strftime("%m-%Y")
+    st.line_chart(mensual.set_index("Fecha"))
 else:
     st.warning("No hay datos suficientes para mostrar evolución")
 
-# RANKING
+# ===== RANKING =====
 st.markdown("### 🏆 Ranking")
 
 if not filtered.empty:
     ranking = filtered["Valorizador"].value_counts().reset_index()
     ranking.columns = ["Valorizador", "Cantidad"]
-
     st.dataframe(ranking, use_container_width=True)
-else:
-    st.warning("No hay datos para ranking")
 
-# EXPORTAR
+# ===== EXPORTAR =====
 st.markdown("### 📤 Exportación")
 
 if not filtered.empty:
@@ -161,7 +164,7 @@ if not filtered.empty:
         "text/csv"
     )
 
-# TABLA FINAL (FORMATO CHILENO SOLO VISUAL 🔥)
+# ===== TABLA FINAL =====
 st.markdown("### 📄 Detalle")
 
 if not filtered.empty:
@@ -169,5 +172,3 @@ if not filtered.empty:
     tabla_mostrar["Fecha emisión"] = tabla_mostrar["Fecha emisión"].dt.strftime("%d-%m-%Y")
 
     st.dataframe(tabla_mostrar, use_container_width=True)
-else:
-    st.warning("No hay datos para mostrar")
