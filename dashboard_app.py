@@ -76,10 +76,20 @@ comunas = filtered["Sucursal"].nunique()
 if not filtered.empty:
 
     df_time = filtered.copy()
-    df_time = df_time.set_index("Fecha emisión")
 
-    mensual = df_time.resample("M").size().reset_index()
-    mensual.columns = ["Fecha", "Cantidad"]
+# asegurarse que es datetime real
+df_time["Fecha emisión"] = pd.to_datetime(df_time["Fecha emisión"], errors="coerce")
+
+# eliminar nulos
+df_time = df_time.dropna(subset=["Fecha emisión"])
+
+# setear índice correctamente
+df_time = df_time.set_index("Fecha emisión")
+
+# 🔥 usar 'MS' en vez de 'M' (más estable en cloud)
+mensual = df_time.resample("MS").size().reset_index()
+
+mensual.columns = ["Fecha", "Cantidad"]
 
     # crecimiento
     if len(mensual) >= 2:
